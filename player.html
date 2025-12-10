@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Tankhilun — YouTube Player</title>
+    <style>
+        :root{--bg:#0f0f0f;--panel:#141414;--muted:#9b9b9b;--accent:#1db954;--text:#e8e8e8}
+        *{box-sizing:border-box}
+        body{margin:0;font-family:Segoe UI,Roboto,Arial;background:linear-gradient(180deg,var(--bg),#0b0b0b);color:var(--text);min-height:100vh}
+        .wrap{max-width:1200px;margin:20px auto;display:grid;grid-template-columns:1fr 420px;gap:18px;padding:16px}
+        @media (max-width:1000px){.wrap{grid-template-columns:1fr;}.player-col{order:-1}}
+
+        /* Left list */
+        .list-panel{background:var(--panel);border-radius:10px;padding:14px;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+        .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+        .list-header h2{font-size:1.1rem;margin:0}
+        .search input{background:#0b0b0b;border:1px solid #222;padding:8px 10px;border-radius:999px;color:var(--text)}
+        .tracks{margin-top:8px}
+        .track{display:flex;gap:12px;padding:10px;border-radius:8px;align-items:center;cursor:pointer}
+        .track:hover{background:rgba(255,255,255,0.02)}
+        .track.active{background:linear-gradient(90deg, rgba(29,185,84,0.12), rgba(29,185,84,0.03));outline:1px solid rgba(29,185,84,0.12)}
+        .thumb{width:64px;height:64px;border-radius:6px;flex:0 0 64px;background:#222;background-size:cover;background-position:center}
+        .meta{flex:1}
+        .meta .title{font-weight:700;color:var(--text)}
+        .meta .sub{color:var(--muted);font-size:13px;margin-top:6px}
+
+        /* Right player */
+        .player-col{background:var(--panel);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+        .player-iframe{width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000}
+        .player-controls{display:flex;align-items:center;gap:10px}
+        .play-btn{background:var(--accent);border:none;color:#07120a;padding:8px 14px;border-radius:999px;font-weight:800;cursor:pointer}
+        .mute-btn{background:transparent;border:1px solid #222;color:var(--muted);padding:6px 10px;border-radius:8px;cursor:pointer}
+        .now-playing{font-weight:700}
+        .note{color:var(--muted);font-size:13px}
+
+        .small{font-size:13px;color:var(--muted)}
+
+        footer{max-width:1200px;margin:12px auto 40px;color:var(--muted);text-align:center}
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="list-panel">
+            <div class="list-header">
+                <h2>Tankhilun — Playlist</h2>
+                <div class="search"><input id="search" placeholder="Хайх..."/></div>
+            </div>
+            <div class="tracks" id="tracks">
+                <!-- Tracks inserted by JS -->
+            </div>
+        </div>
+        <section class="player-new">
+
+    <div class="player-screen">
+        <div id="ytplayer" class="yt-frame"></div>
+    </div>
+
+    <div class="player-info">
+        <div id="now" class="track-title">Artist — Title</div>
+        <div id="nowSub" class="track-sub">Year</div>
+    </div>
+
+    <div class="controls">
+        <button id="playPause" class="btn-play">▶</button>
+        <button id="mute" class="btn-mute">🔇</button>
+    </div>
+
+</section>
+
+        
+    </div>
+
+    <script>
+        // Track list (title, artist, embedId or href if not embeddable, thumbnail)
+        const tracks = [
+            {title:'Shulundug', artist:'Blindfold', id:'2neZ5-Mwscc', year:'2023'},
+            {title:'Ergo (Ska Version) [Live]', artist:'Blindfold', id:'p4BD5jhIg_E', year:'2024'},
+            {title:'Samsara', artist:'The Colors', id:'Mdp18cJFlpQ', year:'2023'},
+            {title:'Chi miniih bolno [Live]', artist:'The Colors', id:'KWdtnafJIHQ', year:'2018'},
+            {title:'1983-86', artist:'The Lemons', id:'X6lnpFv3uEQ', year:'2009'},
+            {title:'Dulguun', artist:'The Lemons', id:'NKLiZwSLHCo', year:'2006'},
+            {title:'Сүүдэр', artist:'Night Train', id:'13WaQIitFmc', year:'2022'},
+            {title:'Night Train (Full Album)', artist:'Night Train',  year:'2020'},
+            {title:'WAKE UP', artist:'Growl of Clown', id:'vTCvUM5Jf54', year:'2023'},
+            {title:'Live @PlaytimeFestival', artist:'Growl of Clown', id:'ZT6LZagJVag', year:'2025'},
+            {title:'Awakening [Live]', artist:'Mohanik', id:'sINe7Z50dsk', year:'2025'},
+            {title:'Чонон Бүжиг (The Wolf Dance)', artist:'Mohanik', id:'kwS78Z_3URI', year:'2020'},
+            {title:'1001 цэцгэс', artist:'The Pips', id:'knka7jYrjzI', year:'2015'},
+            {title:'Our Hiding Place', artist:'The Pips', id:'UAbFyyfp3cc', year:'2016'},
+            {title:'Sing', artist:'A-Sound', id:'w6qdX_eNrvw', year:'2023'},
+            {title:'A-Sound Official (Channel)', artist:'A-Sound',  year:'2007'},
+            {title:'Live @PlaytimeFestival', artist:'Starfish', id:'cFUB5QrDGb8', year:'2025'},
+            {title:'LSB', artist:'Starfish', id:'XQbLb4xii4Q', year:'2008'},
+            {title:'Өвөлжөө', artist:'Magnolian', id:'0RaWPPxvfl4', year:'2021'},
+            {title:'Magnolian Official (Channel)', artist:'Magnolian', year:'2015'}
+        ];
+
+        const tracksEl = document.getElementById('tracks');
+        const playerContainer = document.getElementById('ytplayer');
+        const now = document.getElementById('now');
+        const nowSub = document.getElementById('nowSub');
+        const playPause = document.getElementById('playPause');
+        const mute = document.getElementById('mute');
+        let currentIndex = 0;
+
+        // YouTube IFrame API player
+        let ytPlayer = null;
+        let ytReady = false;
+        let pendingLoad = null; // {id, autoplay}
+
+        // load the IFrame API
+        (function loadYTAPI(){
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(tag);
+        })();
+
+        // Called by YouTube API when ready
+        function onYouTubeIframeAPIReady(){
+            ytPlayer = new YT.Player('ytplayer', {
+                height: '100%',
+                width: '100%',
+                videoId: tracks[0].id,
+                playerVars: { rel: 0, autoplay: 0 },
+                events: {
+                    onReady: function(){
+                        ytReady = true;
+                        if(pendingLoad){ loadVideoById(pendingLoad.id, pendingLoad.autoplay); pendingLoad = null; }
+                    },
+                    onStateChange: function(e){
+                        if(e.data === YT.PlayerState.PLAYING){ isPlaying = true; playPause.textContent = 'Pause'; }
+                        if(e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED){ isPlaying = false; playPause.textContent = 'Play'; }
+                    }
+                }
+            });
+        }
+
+        // If opened with ?id=VIDEOID, store as pending or load immediately
+        (function loadFromQuery(){
+            try{
+                const params = new URLSearchParams(window.location.search);
+                const idParam = params.get('id');
+                if(idParam && /^[A-Za-z0-9_-]{11}$/.test(idParam)){
+                    // try to update UI and load via API (or pending)
+                    const idx = tracks.findIndex(t => t.id === idParam);
+                    if(idx !== -1){ currentIndex = idx; updateNow(tracks[idx]); }
+                    else { now.textContent = `Now Playing — ${idParam}`; nowSub.textContent = ''; }
+                    if(window.YT && ytPlayer && ytReady){ loadVideoById(idParam, true); }
+                    else { pendingLoad = { id: idParam, autoplay: true }; }
+                }
+            }catch(e){ /* ignore */ }
+        })();
+
+        function thumbUrl(id){
+            return id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : 'https://via.placeholder.com/64?text=YT';
+        }
+
+        function renderList(filter=''){
+            tracksEl.innerHTML = '';
+            tracks.forEach((t,i)=>{
+                const visible = (t.title+ ' ' + t.artist).toLowerCase().includes(filter.toLowerCase());
+                if(!visible) return;
+                const div = document.createElement('div');
+                div.className = 'track'+(i===currentIndex?' active':'');
+                div.dataset.index = i;
+                div.innerHTML = `
+                    <div class="thumb" style="background-image:url('${thumbUrl(t.id)}')"></div>
+                    <div class="meta">
+                        <div class="title">${t.title}</div>
+                        <div class="sub">${t.artist} • ${t.year}</div>
+                    </div>
+                `;
+                div.addEventListener('click', ()=>selectTrack(i));
+                tracksEl.appendChild(div);
+            });
+        }
+
+        function loadVideoById(id, autoplay = true){
+            if(ytReady && ytPlayer && typeof ytPlayer.loadVideoById === 'function'){
+                try{
+                    ytPlayer.loadVideoById({videoId: id, startSeconds: 0});
+                    if(autoplay) ytPlayer.playVideo();
+                }catch(e){ /* ignore */ }
+            } else {
+                // API not ready yet, queue
+                pendingLoad = { id, autoplay };
+            }
+        }
+
+        function selectTrack(i){
+            const t = tracks[i];
+            // handle non-embeddable links
+            if(t.href){ window.open(t.href, '_blank'); return; }
+            loadVideoById(t.id, true);
+            currentIndex = i;
+            updateNow(t);
+            // update URL without reloading so Back works nicely
+            try{ window.history.replaceState(null, '', window.location.pathname + '?id=' + encodeURIComponent(t.id)); }catch(e){ /* ignore */ }
+            highlightActive();
+        }
+
+        function updateNow(t){ now.textContent = `${t.artist} — ${t.title}`; nowSub.textContent = t.year; }
+
+        function highlightActive(){
+            document.querySelectorAll('.track').forEach(el=>el.classList.remove('active'));
+            const el = document.querySelector(`.track[data-index="${currentIndex}"]`);
+            if(el) el.classList.add('active');
+        }
+
+        // search
+        document.getElementById('search').addEventListener('input', (e)=>{ renderList(e.target.value) });
+
+        // play/pause via YouTube IFrame API when available
+        let isPlaying = false;
+        playPause.addEventListener('click', ()=>{
+            try{
+                if(ytReady && ytPlayer){
+                    const state = ytPlayer.getPlayerState();
+                    if(state === YT.PlayerState.PLAYING){ ytPlayer.pauseVideo(); }
+                    else { ytPlayer.playVideo(); }
+                } else {
+                    // fallback: toggle by using pendingLoad or simple reload
+                    if(!isPlaying && pendingLoad && pendingLoad.id){ loadVideoById(pendingLoad.id, true); }
+                }
+            }catch(e){ /* ignore */ }
+        });
+
+        // mute/unmute via API
+        let muted = false;
+        mute.addEventListener('click', ()=>{
+            try{
+                if(ytReady && ytPlayer){
+                    if(muted){ ytPlayer.unMute(); muted = false; mute.textContent = 'Mute'; }
+                    else { ytPlayer.mute(); muted = true; mute.textContent = 'Muted'; }
+                } else {
+                    muted = !muted; mute.textContent = muted? 'Muted' : 'Mute';
+                }
+            }catch(e){ /* ignore */ }
+        });
+
+        // initial render
+        renderList();
+        updateNow(tracks[0]);
+        highlightActive();
+    </script>
+
+    <footer>Open this file in your browser. Click a track to load it into the embedded player.</footer>
+</body>
+</html>
